@@ -1,865 +1,369 @@
 <!DOCTYPE html>
-
 <html lang="ru">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
 <title>Мои задачи</title>
-
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-
 <style>
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   body {
-
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-
     background: var(--tg-theme-bg-color, #ffffff);
-
     color: var(--tg-theme-text-color, #000000);
-
     min-height: 100vh;
-
     padding-bottom: 80px;
-
   }
-
   :root {
-
     --cat-work: hsl(217,91%,60%);
-
     --cat-study: hsl(142,71%,45%);
-
     --cat-personal: hsl(280,67%,55%);
-
     --cat-health: hsl(0,84%,60%);
-
   }
-
   header {
-
     padding: 16px 16px 12px;
-
     border-bottom: 0.5px solid rgba(0,0,0,0.1);
-
     position: sticky; top: 0;
-
     background: var(--tg-theme-bg-color, #ffffff);
-
     z-index: 10;
-
   }
-
   header h1 { font-size: 20px; font-weight: 600; }
-
   header p { font-size: 13px; opacity: 0.5; margin-top: 2px; }
-
-  .gcal-bar {
-
-    padding: 10px 16px;
-
-    border-bottom: 0.5px solid rgba(0,0,0,0.07);
-
-    display: flex; align-items: center; gap: 10px;
-
-    font-size: 13px;
-
-  }
-
-  .gcal-bar.hidden { display: none; }
-
-  .btn-gcal-connect {
-
-    padding: 6px 14px; border-radius: 20px; border: none;
-
-    background: #4285f4; color: #fff;
-
-    font-size: 13px; font-weight: 500; cursor: pointer;
-
-  }
-
-  .gcal-status { opacity: 0.5; }
-
-  .gcal-status.connected { color: #1d9e75; opacity: 1; font-weight: 500; }
-
   .cats {
-
     display: flex; gap: 8px;
-
     padding: 12px 16px;
-
     overflow-x: auto; scrollbar-width: none;
-
   }
-
   .cats::-webkit-scrollbar { display: none; }
-
   .cat-btn {
-
     flex-shrink: 0; padding: 6px 14px;
-
     border-radius: 20px; border: 1.5px solid transparent;
-
     font-size: 13px; font-weight: 500; cursor: pointer;
-
     background: transparent; transition: all 0.15s;
-
   }
-
   .cat-btn.active { color: #fff; }
-
   .cat-btn[data-id="all"] { border-color: rgba(0,0,0,0.2); color: var(--tg-theme-text-color,#000); }
-
   .cat-btn[data-id="all"].active { background: rgba(0,0,0,0.15); color: var(--tg-theme-text-color,#000); }
-
   .cat-btn[data-id="work"] { border-color: var(--cat-work); color: var(--cat-work); }
-
   .cat-btn[data-id="work"].active { background: var(--cat-work); }
-
   .cat-btn[data-id="study"] { border-color: var(--cat-study); color: var(--cat-study); }
-
   .cat-btn[data-id="study"].active { background: var(--cat-study); }
-
   .cat-btn[data-id="personal"] { border-color: var(--cat-personal); color: var(--cat-personal); }
-
   .cat-btn[data-id="personal"].active { background: var(--cat-personal); }
-
   .cat-btn[data-id="health"] { border-color: var(--cat-health); color: var(--cat-health); }
-
   .cat-btn[data-id="health"].active { background: var(--cat-health); }
-
   .tasks-list { padding: 0 16px; }
-
   .loading { text-align: center; padding: 60px 16px; opacity: 0.4; font-size: 15px; }
-
   .empty-state { text-align: center; padding: 60px 16px; opacity: 0.4; }
-
   .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
-
   .empty-state p { font-size: 15px; }
-
   .task-item {
-
     display: flex; align-items: flex-start; gap: 12px;
-
     padding: 14px 0; border-bottom: 0.5px solid rgba(0,0,0,0.08);
-
     transition: opacity 0.2s;
-
   }
-
   .task-item.done { opacity: 0.4; }
-
   .task-item.done .task-title { text-decoration: line-through; }
-
   .task-check {
-
     width: 22px; height: 22px; border-radius: 50%;
-
     border: 2px solid; flex-shrink: 0; margin-top: 1px;
-
     display: flex; align-items: center; justify-content: center;
-
     transition: all 0.15s; cursor: pointer;
-
   }
-
   .task-check.checked { color: #fff; }
-
   .task-check .check-icon { font-size: 12px; display: none; }
-
   .task-check.checked .check-icon { display: block; }
-
   .task-body { flex: 1; min-width: 0; }
-
   .task-title { font-size: 15px; font-weight: 500; line-height: 1.4; }
-
   .task-meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
-
   .task-cat-badge {
-
     font-size: 11px; font-weight: 500;
-
     padding: 2px 8px; border-radius: 10px; opacity: 0.85; color: #fff;
-
   }
-
   .task-date { font-size: 12px; opacity: 0.45; }
-
   .btn-cal {
-
     font-size: 11px; padding: 2px 8px; border-radius: 10px;
-
     border: 1px solid #4285f4; color: #4285f4;
-
     background: none; cursor: pointer; white-space: nowrap;
-
+    text-decoration: none; display: inline-block; line-height: 1.8;
   }
-
-  .btn-cal.added { border-color: #1d9e75; color: #1d9e75; }
-
   .task-del {
-
     background: none; border: none; font-size: 18px;
-
     opacity: 0.3; cursor: pointer; padding: 2px 4px;
-
     transition: opacity 0.15s; flex-shrink: 0;
-
     color: var(--tg-theme-text-color, #000);
-
   }
-
   .task-del:hover { opacity: 0.7; }
-
   .fab {
-
     position: fixed; bottom: 24px; right: 20px;
-
     width: 52px; height: 52px; border-radius: 50%;
-
     background: var(--tg-theme-button-color, #2481cc);
-
     color: var(--tg-theme-button-text-color, #ffffff);
-
     font-size: 26px; border: none; cursor: pointer;
-
     box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-
     display: flex; align-items: center; justify-content: center; z-index: 20;
-
   }
-
   .overlay {
-
     display: none; position: fixed; inset: 0;
-
     background: rgba(0,0,0,0.4); z-index: 30;
-
     align-items: flex-end; justify-content: center;
-
   }
-
   .overlay.open { display: flex; }
-
   .sheet {
-
     background: var(--tg-theme-bg-color, #fff);
-
     width: 100%; border-radius: 16px 16px 0 0;
-
     padding: 20px 16px 36px; max-width: 480px;
-
   }
-
   .sheet h2 { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
-
   .field { margin-bottom: 14px; }
-
   .field label { font-size: 13px; opacity: 0.6; display: block; margin-bottom: 6px; }
-
   .field input, .field select {
-
     width: 100%; padding: 10px 12px; border-radius: 10px;
-
     border: 1px solid rgba(0,0,0,0.15);
-
     background: var(--tg-theme-secondary-bg-color, #f4f4f4);
-
     color: var(--tg-theme-text-color, #000);
-
     font-size: 15px; font-family: inherit;
-
   }
-
   .sheet-btns { display: flex; gap: 10px; margin-top: 6px; }
-
   .btn-cancel {
-
     flex: 1; padding: 12px; border-radius: 10px;
-
     border: 1px solid rgba(0,0,0,0.15); background: transparent;
-
     color: var(--tg-theme-text-color, #000); font-size: 15px; cursor: pointer;
-
   }
-
   .btn-add {
-
     flex: 2; padding: 12px; border-radius: 10px; border: none;
-
     background: var(--tg-theme-button-color, #2481cc);
-
     color: var(--tg-theme-button-text-color, #fff);
-
     font-size: 15px; font-weight: 600; cursor: pointer;
-
   }
-
   .done-toggle {
-
     padding: 10px 0; font-size: 13px; opacity: 0.5;
-
     cursor: pointer; display: inline-block; margin-top: 4px;
-
   }
-
 </style>
-
 </head>
-
 <body>
-
- 
-
+ 
 <header>
-
   <h1>Мои задачи</h1>
-
   <p id="task-count">Загрузка...</p>
-
 </header>
-
- 
-
-<div class="gcal-bar" id="gcal-bar">
-
-  <span id="gcal-status" class="gcal-status">Google Календарь не подключён</span>
-
-  <button class="btn-gcal-connect" id="gcal-connect-btn" onclick="connectGoogle()">Подключить</button>
-
-</div>
-
- 
-
+ 
 <div class="cats">
-
   <button class="cat-btn active" data-id="all">Все</button>
-
   <button class="cat-btn" data-id="work">Работа</button>
-
   <button class="cat-btn" data-id="study">Учёба</button>
-
   <button class="cat-btn" data-id="personal">Личное</button>
-
   <button class="cat-btn" data-id="health">Здоровье</button>
-
 </div>
-
- 
-
+ 
 <div class="tasks-list" id="tasks-list"><div class="loading">Загрузка задач...</div></div>
-
- 
-
+ 
 <button class="fab" id="fab-btn">+</button>
-
- 
-
+ 
 <div class="overlay" id="overlay">
-
   <div class="sheet">
-
     <h2>Новая задача</h2>
-
     <div class="field">
-
       <label>Название</label>
-
       <input type="text" id="inp-title" placeholder="Что нужно сделать?" maxlength="120">
-
     </div>
-
     <div class="field">
-
       <label>Категория</label>
-
       <select id="inp-cat">
-
         <option value="work">Работа</option>
-
         <option value="study">Учёба</option>
-
         <option value="personal">Личное</option>
-
         <option value="health">Здоровье</option>
-
       </select>
-
     </div>
-
     <div class="field">
-
       <label>Срок (необязательно)</label>
-
       <input type="date" id="inp-date">
-
     </div>
-
     <div class="sheet-btns">
-
       <button class="btn-cancel" id="cancel-btn">Отмена</button>
-
       <button class="btn-add" id="add-btn">Добавить</button>
-
     </div>
-
   </div>
-
 </div>
-
- 
-
+ 
 <script>
-
+// =============================================
+// ВСТАВЬ СЮДА СВОИ ДАННЫЕ ИЗ SUPABASE
 const SUPABASE_URL = 'https://efoflfkeajrzjkglfdbk.supabase.co'
-
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmb2ZsZmtlYWpyemprZ2xmZGJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3MjEyMzIsImV4cCI6MjA5MTI5NzIzMn0.YAE7bQ7H0YwsZ5eMOTUz6taWiJl181zuVGX6vI4gPW8'
-
-const GCAL_CLIENT_ID = '561631568087-1rn9imhk00frcquobfbep0ghj27i54ui.apps.googleusercontent.com'
-
-const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
-
- 
-
+// =============================================
+ 
 const tg = window.Telegram?.WebApp
-
 if (tg) { tg.ready(); tg.expand(); }
-
 const USER_ID = tg?.initDataUnsafe?.user?.id?.toString() || 'dev_user'
-
- 
-
+ 
 const { createClient } = supabase
-
 const db = createClient(SUPABASE_URL, SUPABASE_KEY)
-
- 
-
+ 
 const CAT_COLORS = {
-
   work: 'hsl(217,91%,60%)', study: 'hsl(142,71%,45%)',
-
   personal: 'hsl(280,67%,55%)', health: 'hsl(0,84%,60%)'
-
 }
-
 const CAT_NAMES = { work: 'Работа', study: 'Учёба', personal: 'Личное', health: 'Здоровье' }
-
- 
-
+ 
 let tasks = []
-
 let filter = 'all'
-
-let gcalToken = localStorage.getItem('gcal_token') || null
-
-let calendarAdded = JSON.parse(localStorage.getItem('cal_added') || '{}')
-
- 
-
-// ---- GOOGLE CALENDAR ----
-
-function connectGoogle() {
-
-  const client = google.accounts.oauth2.initTokenClient({
-
-    client_id: GCAL_CLIENT_ID,
-
-    scope: GCAL_SCOPE,
-
-    callback: (resp) => {
-
-      if (resp.access_token) {
-
-        gcalToken = resp.access_token
-
-        localStorage.setItem('gcal_token', gcalToken)
-
-        updateGcalBar()
-
-        render()
-
-      }
-
-    }
-
-  })
-
-  client.requestAccessToken()
-
+ 
+function makeCalendarUrl(title, date) {
+  // Формат даты для Google: YYYYMMDD
+  const d = date.replace(/-/g, '')
+  // Следующий день для end date
+  const endDate = new Date(date)
+  endDate.setDate(endDate.getDate() + 1)
+  const end = endDate.toISOString().slice(0,10).replace(/-/g,'')
+  const text = encodeURIComponent(title)
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${d}/${end}`
 }
-
- 
-
-function updateGcalBar() {
-
-  const status = document.getElementById('gcal-status')
-
-  const btn = document.getElementById('gcal-connect-btn')
-
-  if (gcalToken) {
-
-    status.textContent = 'Google Календарь подключён'
-
-    status.className = 'gcal-status connected'
-
-    btn.style.display = 'none'
-
-  } else {
-
-    status.textContent = 'Google Календарь не подключён'
-
-    status.className = 'gcal-status'
-
-    btn.style.display = 'inline-block'
-
-  }
-
-}
-
- 
-
-async function addToCalendar(id, title, date) {
-
-  if (!gcalToken) { connectGoogle(); return; }
-
-  const event = {
-
-    summary: title,
-
-    start: { date: date },
-
-    end: { date: date }
-
-  }
-
-  const resp = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
-
-    method: 'POST',
-
-    headers: {
-
-      'Authorization': 'Bearer ' + gcalToken,
-
-      'Content-Type': 'application/json'
-
-    },
-
-    body: JSON.stringify(event)
-
-  })
-
-  if (resp.ok) {
-
-    calendarAdded[id] = true
-
-    localStorage.setItem('cal_added', JSON.stringify(calendarAdded))
-
-    render()
-
-    if (tg) tg.HapticFeedback?.notificationOccurred('success')
-
-  } else if (resp.status === 401) {
-
-    gcalToken = null
-
-    localStorage.removeItem('gcal_token')
-
-    updateGcalBar()
-
-    connectGoogle()
-
-  }
-
-}
-
- 
-
-// ---- SUPABASE ----
-
-async function loadTasks() {
-
-  const { data, error } = await db
-
-    .from('tasks').select('*')
-
-    .eq('user_id', USER_ID)
-
-    .order('created_at', { ascending: false })
-
-  if (!error) { tasks = data; render(); }
-
-  else { document.getElementById('tasks-list').innerHTML = '<div class="loading">Ошибка загрузки 😔</div>' }
-
-}
-
- 
-
-async function addTask(title, cat, date) {
-
-  const { data, error } = await db.from('tasks')
-
-    .insert([{ user_id: USER_ID, title, cat, date: date || null, done: false }])
-
-    .select().single()
-
-  if (!error) { tasks.unshift(data); render(); }
-
-}
-
- 
-
-async function toggleTask(id) {
-
-  const t = tasks.find(t => t.id === id)
-
-  if (!t) return
-
-  const { error } = await db.from('tasks').update({ done: !t.done }).eq('id', id)
-
-  if (!error) { t.done = !t.done; render(); }
-
-  if (tg) tg.HapticFeedback?.impactOccurred('light')
-
-}
-
- 
-
-async function deleteTask(id) {
-
-  const { error } = await db.from('tasks').delete().eq('id', id)
-
-  if (!error) { tasks = tasks.filter(t => t.id !== id); render(); }
-
-}
-
- 
-
-// ---- RENDER ----
-
-function render() {
-
-  updateGcalBar()
-
-  const list = document.getElementById('tasks-list')
-
-  const visible = filter === 'all' ? tasks : tasks.filter(t => t.cat === filter)
-
-  const active = visible.filter(t => !t.done)
-
-  const done = visible.filter(t => t.done)
-
-  const total = tasks.filter(t => !t.done).length
-
-  document.getElementById('task-count').textContent =
-
-    total === 0 ? 'Все задачи выполнены' : `${total} ${plural(total,'задача','задачи','задач')} активно`
-
-  if (visible.length === 0) {
-
-    list.innerHTML = `<div class="empty-state"><div class="icon">✓</div><p>Задач нет. Добавь первую!</p></div>`
-
-    return
-
-  }
-
-  let html = active.map(taskHTML).join('')
-
-  if (done.length) {
-
-    html += `<div class="done-toggle" onclick="toggleDoneSection(this)">▸ Выполнено (${done.length})</div>
-
-    <div id="done-section" style="display:none">${done.map(taskHTML).join('')}</div>`
-
-  }
-
-  list.innerHTML = html
-
-}
-
- 
-
-function taskHTML(t) {
-
-  const color = CAT_COLORS[t.cat] || '#888'
-
-  const cs = t.done ? `background:${color};border-color:${color};` : `border-color:${color};`
-
-  const dateStr = t.date ? `<span class="task-date">${formatDate(t.date)}</span>` : ''
-
-  const calBtn = (t.date && gcalToken)
-
-    ? `<button class="btn-cal ${calendarAdded[t.id] ? 'added' : ''}"
-
-        onclick="addToCalendar('${t.id}','${escHtml(t.title)}','${t.date}')">
-
-        ${calendarAdded[t.id] ? '✓ в календаре' : '+ в календарь'}
-
-      </button>`
-
-    : ''
-
-  return `<div class="task-item ${t.done?'done':''}">
-
-    <div class="task-check ${t.done?'checked':''}" style="${cs}" onclick="toggleTask('${t.id}')">
-
-      <span class="check-icon">✓</span>
-
-    </div>
-
-    <div class="task-body">
-
-      <div class="task-title">${escHtml(t.title)}</div>
-
-      <div class="task-meta">
-
-        <span class="task-cat-badge" style="background:${color}">${CAT_NAMES[t.cat]}</span>
-
-        ${dateStr}
-
-        ${calBtn}
-
-      </div>
-
-    </div>
-
-    <button class="task-del" onclick="confirmDelete('${t.id}')">✕</button>
-
-  </div>`
-
-}
-
- 
-
-function confirmDelete(id) {
-
+ 
+function openCalendar(title, date) {
+  const url = makeCalendarUrl(title, date)
   if (tg) {
-
-    tg.showPopup({
-
-      title: 'Удалить задачу?',
-
-      message: 'Это действие нельзя отменить.',
-
-      buttons: [{ id:'del', type:'destructive', text:'Удалить' }, { type:'cancel' }]
-
-    }, (btn) => { if (btn==='del') deleteTask(id) })
-
+    tg.openLink(url)
   } else {
-
-    if (confirm('Удалить задачу?')) deleteTask(id)
-
+    window.open(url, '_blank')
   }
-
 }
-
- 
-
+ 
+async function loadTasks() {
+  const { data, error } = await db
+    .from('tasks').select('*')
+    .eq('user_id', USER_ID)
+    .order('created_at', { ascending: false })
+  if (!error) { tasks = data; render(); }
+  else { document.getElementById('tasks-list').innerHTML = '<div class="loading">Ошибка загрузки 😔</div>' }
+}
+ 
+async function addTask(title, cat, date) {
+  const { data, error } = await db.from('tasks')
+    .insert([{ user_id: USER_ID, title, cat, date: date || null, done: false }])
+    .select().single()
+  if (!error) { tasks.unshift(data); render(); }
+}
+ 
+async function toggleTask(id) {
+  const t = tasks.find(t => t.id === id)
+  if (!t) return
+  const { error } = await db.from('tasks').update({ done: !t.done }).eq('id', id)
+  if (!error) { t.done = !t.done; render(); }
+  if (tg) tg.HapticFeedback?.impactOccurred('light')
+}
+ 
+async function deleteTask(id) {
+  const { error } = await db.from('tasks').delete().eq('id', id)
+  if (!error) { tasks = tasks.filter(t => t.id !== id); render(); }
+}
+ 
+function render() {
+  const list = document.getElementById('tasks-list')
+  const visible = filter === 'all' ? tasks : tasks.filter(t => t.cat === filter)
+  const active = visible.filter(t => !t.done)
+  const done = visible.filter(t => t.done)
+  const total = tasks.filter(t => !t.done).length
+  document.getElementById('task-count').textContent =
+    total === 0 ? 'Все задачи выполнены' : `${total} ${plural(total,'задача','задачи','задач')} активно`
+  if (visible.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">✓</div><p>Задач нет. Добавь первую!</p></div>`
+    return
+  }
+  let html = active.map(taskHTML).join('')
+  if (done.length) {
+    html += `<div class="done-toggle" onclick="toggleDoneSection(this)">▸ Выполнено (${done.length})</div>
+    <div id="done-section" style="display:none">${done.map(taskHTML).join('')}</div>`
+  }
+  list.innerHTML = html
+}
+ 
+function taskHTML(t) {
+  const color = CAT_COLORS[t.cat] || '#888'
+  const cs = t.done ? `background:${color};border-color:${color};` : `border-color:${color};`
+  const dateStr = t.date ? `<span class="task-date">${formatDate(t.date)}</span>` : ''
+  const calBtn = t.date
+    ? `<button class="btn-cal" onclick="openCalendar('${escAttr(t.title)}','${t.date}')">+ в календарь</button>`
+    : ''
+  return `<div class="task-item ${t.done?'done':''}">
+    <div class="task-check ${t.done?'checked':''}" style="${cs}" onclick="toggleTask('${t.id}')">
+      <span class="check-icon">✓</span>
+    </div>
+    <div class="task-body">
+      <div class="task-title">${escHtml(t.title)}</div>
+      <div class="task-meta">
+        <span class="task-cat-badge" style="background:${color}">${CAT_NAMES[t.cat]}</span>
+        ${dateStr}
+        ${calBtn}
+      </div>
+    </div>
+    <button class="task-del" onclick="confirmDelete('${t.id}')">✕</button>
+  </div>`
+}
+ 
+function confirmDelete(id) {
+  if (tg) {
+    tg.showPopup({
+      title: 'Удалить задачу?',
+      message: 'Это действие нельзя отменить.',
+      buttons: [{ id:'del', type:'destructive', text:'Удалить' }, { type:'cancel' }]
+    }, (btn) => { if (btn==='del') deleteTask(id) })
+  } else {
+    if (confirm('Удалить задачу?')) deleteTask(id)
+  }
+}
+ 
 function toggleDoneSection(el) {
-
   const sec = document.getElementById('done-section')
-
   const open = sec.style.display !== 'none'
-
   sec.style.display = open ? 'none' : 'block'
-
   el.textContent = (open?'▸':'▾') + el.textContent.slice(1)
-
 }
-
- 
-
+ 
 document.querySelectorAll('.cat-btn').forEach(btn => {
-
   btn.addEventListener('click', () => {
-
     document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'))
-
     btn.classList.add('active')
-
     filter = btn.dataset.id
-
     render()
-
   })
-
 })
-
- 
-
+ 
 const overlay = document.getElementById('overlay')
-
 document.getElementById('fab-btn').onclick = () => { overlay.classList.add('open'); document.getElementById('inp-title').focus(); }
-
 document.getElementById('cancel-btn').onclick = () => overlay.classList.remove('open')
-
 overlay.onclick = (e) => { if (e.target === overlay) overlay.classList.remove('open') }
-
- 
-
+ 
 document.getElementById('add-btn').onclick = async () => {
-
   const title = document.getElementById('inp-title').value.trim()
-
   if (!title) { document.getElementById('inp-title').focus(); return }
-
   const btn = document.getElementById('add-btn')
-
   btn.textContent = '...'; btn.disabled = true
-
   await addTask(title, document.getElementById('inp-cat').value, document.getElementById('inp-date').value)
-
   btn.textContent = 'Добавить'; btn.disabled = false
-
   overlay.classList.remove('open')
-
   document.getElementById('inp-title').value = ''
-
   document.getElementById('inp-date').value = ''
-
   if (tg) tg.HapticFeedback?.notificationOccurred('success')
-
 }
-
- 
-
+ 
 function formatDate(d) {
-
   if (!d) return ''
-
   const [y,m,day] = d.split('-')
-
   return `${day}.${m}.${y}`
-
 }
-
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
-
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;') }
 function plural(n,a,b,c) {
-
   const m=n%100; if(m>=11&&m<=19) return c
-
   const r=n%10; if(r===1) return a; if(r>=2&&r<=4) return b; return c
-
 }
-
- 
-
+ 
 loadTasks()
-
 </script>
-
 </body>
-
 </html>
+ 
